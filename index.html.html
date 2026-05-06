@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>과학 실험: 흐르는 물에 의한 지표의 변화</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #f0f4f8; user-select: none; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+            pointer-events: none; display: flex; flex-direction: column; align-items: center;
+        }
+
+        h1 {
+            background-color: rgba(255, 255, 255, 0.95); padding: 12px 30px;
+            border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            color: #333; margin-top: 20px; pointer-events: auto;
+            border: 3px solid #ff758c; text-align: center; font-size: 24px;
+        }
+
+        .center-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 30px; border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); pointer-events: auto;
+            width: 450px; max-width: 90vw; border: 5px solid #ff758c;
+            display: none; flex-direction: column; gap: 15px; z-index: 100;
+        }
+        .center-modal h2 { margin-top: 0; color: #ff4757; text-align: center; font-size: 22px; }
+        .center-modal p { font-size: 16px; line-height: 1.5; color: #333; margin: 5px 0; }
+
+        .side-modal {
+            position: absolute; top: 20px; right: 20px; 
+            background: white; padding: 25px; border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3); pointer-events: auto;
+            width: 350px; max-width: 85vw; display: none; flex-direction: column; gap: 12px; z-index: 100;
+        }
+        #prediction-modal { border: 4px solid #ff758c; }
+        #observation-modal { border: 4px solid #2ecc71; }
+        
+        .side-modal h2 { margin: 0; font-size: 18px; color: #333; }
+        #prediction-modal h2 { color: #ff4757; }
+        #observation-modal h2 { color: #27ae60; }
+        
+        .side-modal label { font-size: 14px; font-weight: bold; color: #333; margin-top: 5px; display: block;}
+        .side-modal textarea, .center-modal input[type="text"] {
+            width: 100%; padding: 10px; border-radius: 8px;
+            border: 2px solid #ccc; font-family: inherit; font-size: 14px; 
+            box-sizing: border-box; transition: border-color 0.2s;
+            cursor: text; user-select: text;
+        }
+        .side-modal textarea { height: 60px; resize: none; }
+        .side-modal textarea:focus, .center-modal input[type="text"]:focus { border-color: #ff4757; outline: none; }
+        #observation-modal textarea:focus { border-color: #2ecc71; }
+
+        .btn-primary {
+            background-color: #ff4757; color: white; border: none; padding: 12px;
+            border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;
+            transition: background 0.2s; margin-top: 5px; text-align: center; width: 100%;
+        }
+        .btn-primary:hover { background-color: #ff6b81; }
+        #submit-obs-btn { background-color: #2ecc71; }
+        #submit-obs-btn:hover { background-color: #27ae60; }
+
+        #cup-wrapper {
+            position: absolute; top: 110px; left: 50%; transform: translateX(-50%);
+            pointer-events: auto; display: none; flex-direction: column; align-items: center; z-index: 50;
+        }
+        
+        /* ⭐️ 종이컵 기울기 좌우 반전 수정 */
+        #paper-cup {
+            width: 50px; height: 70px;
+            background: linear-gradient(135deg, #ffffff, #e6e6e6);
+            border: 2px solid #999; border-radius: 5px 5px 15px 15px;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1), 0 5px 10px rgba(0,0,0,0.3);
+            cursor: pointer; position: relative;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform-origin: bottom left; /* 👈 기준점을 왼쪽 아래로 변경 */
+        }
+        #paper-cup::after {
+            content: ''; position: absolute; top: -8px; left: -2px; width: 50px; height: 16px;
+            background: #fff; border: 2px solid #999; border-radius: 50%;
+        }
+        #paper-cup.pouring { transform: rotate(-70deg) translate(-15px, 15px); } /* 👈 왼쪽으로 기울어지도록 수정 */
+        
+        .instruction {
+            background: rgba(255,255,255,0.95); padding: 8px 15px; border-radius: 10px;
+            font-weight: bold; color: #333; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 15px;
+        }
+
+        .marker {
+            position: absolute; background: white; width: 45px; height: 45px;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 22px; cursor: pointer; pointer-events: auto;
+            border: 4px solid #333; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transform: translate(-50%, -50%); display: none; z-index: 40;
+            transition: transform 0.1s;
+        }
+        .marker:hover { transform: translate(-50%, -50%) scale(1.15); }
+        #marker-upper { border-color: #e74c3c; color: #e74c3c; }
+        #marker-middle { border-color: #f39c12; color: #f39c12; }
+        #marker-lower { border-color: #2ecc71; color: #27ae60; }
+
+        .explanation {
+            background-color: #f8f9fa; padding: 12px; border-radius: 8px;
+            border-left: 5px solid #2ecc71; font-size: 14px; line-height: 1.6;
+            display: none; color: #333; margin-top: 10px;
+        }
+        .explanation strong { color: #27ae60; font-size: 16px;}
+
+        .intro-graphic {
+            background: #e3f2fd; border-radius: 10px; padding: 15px; text-align: center;
+            margin-bottom: 15px; border: 2px dashed #90caf9;
+        }
+
+        #start-quiz-btn {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: auto; padding: 15px 40px; font-size: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 50; display: none;
+            pointer-events: auto; 
+        }
+        .quiz-option-btn {
+            background-color: #f8f9fa; color: #333; border: 2px solid #ccc;
+            padding: 12px; border-radius: 8px; font-size: 16px; cursor: pointer;
+            text-align: left; transition: all 0.2s; margin-bottom: 8px;
+        }
+        .quiz-option-btn:hover { background-color: #e9ecef; border-color: #ff4757; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <h1 id="main-title">🍓 흐르는 물에 의한 지표의 변화</h1>
+        
+        <div id="cup-wrapper">
+            <div id="paper-cup"></div>
+            <div class="instruction" id="cup-instruction">종이컵을 마우스로 꾹 누르고 있으면 물이 흐릅니다.</div>
+        </div>
+
+        <button id="start-quiz-btn" class="btn-primary">마무리 퀴즈 풀기 📝</button>
+    </div>
+
+    <!-- 실험 안내 모달 -->
+    <div id="intro-modal" class="center-modal" style="display: flex;">
+        <h2>🌊 오늘의 과학 실험</h2>
+        <div class="intro-graphic">
+            <div style="font-size: 40px;">🥤 ➡️ ⛰️</div>
+            <p style="font-size: 14px; font-weight: bold; color: #1565c0; margin-top: 10px;">흙 언덕에 물을 부어보자!</p>
+        </div>
+        <p>화면 속 <strong>흙 언덕 꼭대기</strong>에 종이컵으로 물을 흘려보낼 거예요.</p>
+        <p>흐르는 물은 흙 언덕의 모습을 어떻게 바꿀까요? 마우스로 흙 언덕을 이리저리 돌려보며, 물이 흐르기 전 모습을 상상해 봅시다.</p>
+        <button id="go-pred-btn" class="btn-primary">상상해 보기 (다음)</button>
+    </div>
+
+    <!-- 예상하기 폼 -->
+    <div id="prediction-modal" class="side-modal">
+        <h2>🤔 실험 전 예상해 보기</h2>
+        <div>
+            <label>1. 물이 닿는 상류는 어떻게 변할까요?</label>
+            <textarea id="pred-upper" placeholder="지형을 돌려보며 예상을 적어보세요."></textarea>
+        </div>
+        <div>
+            <label>2. 물이 흐르는 하류는 어떻게 변할까요?</label>
+            <textarea id="pred-lower" placeholder="지형을 돌려보며 예상을 적어보세요."></textarea>
+        </div>
+        <button id="start-btn" class="btn-primary">입력 완료! 실험 시작</button>
+    </div>
+
+    <!-- 관찰 결과 기록 폼 -->
+    <div id="observation-modal" class="side-modal">
+        <h2 id="obs-title">관찰 결과 기록</h2>
+        <div id="obs-input-area">
+            <label>어떤 변화가 일어났나요?</label>
+            <textarea id="obs-text" placeholder="관찰 내용을 타자로 적어주세요."></textarea>
+            <button id="submit-obs-btn" class="btn-primary">결과 제출하기</button>
+        </div>
+        
+        <div id="obs-explanation" class="explanation"></div>
+        <button id="close-obs-btn" class="btn-primary" style="display:none; background-color:#607D8B;">줌 아웃 (전체 보기)</button>
+    </div>
+
+    <!-- 마무리 퀴즈 모달 -->
+    <div id="quiz-modal" class="center-modal" style="border-color: #9b59b6;">
+        <h2 style="color: #8e44ad;">📝 마무리 퀴즈</h2>
+        <p id="quiz-question" style="font-size: 18px; font-weight: bold; text-align: center; word-break: keep-all;"></p>
+        <div id="quiz-content" style="display: flex; flex-direction: column;"></div>
+        <p id="quiz-feedback" style="font-weight: bold; text-align: center; height: 24px; margin: 5px 0 0 0;"></p>
+    </div>
+
+    <!-- 줌인 마커 -->
+    <div id="marker-upper" class="marker" title="상류 관찰하기">🔍</div>
+    <div id="marker-middle" class="marker" title="중류 관찰하기">🔍</div>
+    <div id="marker-lower" class="marker" title="하류 관찰하기">🔍</div>
+
+    <script>
+        // ★★★ 선생님의 구글 앱스 스크립트 웹앱 URL을 아래에 붙여넣어 주세요! ★★★
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwByKf8uEI2MdWZyxgU0KD7rGtuSRP8x9uDYsgtd7mV0dkpFgsxQQ41hgwcVMIrtnD1Uw/exec"; 
+
+        // 구글 시트로 데이터를 전송하는 함수
+        function sendDataToSheet(type, section, content) {
+            if (WEB_APP_URL === "여기에_웹앱_URL_붙여넣기") return; 
+            fetch(WEB_APP_URL, {
+                method: "POST",
+                body: JSON.stringify({
+                    type: type,
+                    section: section,
+                    content: content
+                })
+            }).catch(error => console.error("데이터 전송 에러:", error));
+        }
+
+        // --- Three.js 기본 설정 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xe0e5ec);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 15, 25);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+        
+        let isCameraLerping = false;
+        let targetCameraPos = new THREE.Vector3();
+        let targetControlsTarget = new THREE.Vector3();
+        const defaultCameraPos = new THREE.Vector3(20, 15, 25);
+        const defaultControlsTarget = new THREE.Vector3(0, 0, 0);
+
+        // 조명
+        scene.add(new THREE.AmbientLight(0xffffff, 0.25)); 
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.95); 
+        dirLight.position.set(20, 15, 5); 
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- 입체 지형 생성 ---
+        const width = 30, length = 30, segments = 150;
+        let geometry, material, terrain;
+        let originalPositions = [];
+        
+        const baseColor = new THREE.Color(0xD4B895);      
+        const wetBaseColor = new THREE.Color(0x5C3A21);   
+        const deepShadowColor = new THREE.Color(0x050201);
+        const depositedColor = new THREE.Color(0x7A4B2E); 
+
+        function createTerrain() {
+            geometry = new THREE.PlaneGeometry(width, length, segments, segments);
+            geometry.rotateX(-Math.PI / 2);
+
+            const positions = geometry.attributes.position;
+            const colors = [];
+            originalPositions = [];
+
+            for (let i = 0; i < positions.count; i++) {
+                let x = positions.getX(i);
+                let z = positions.getZ(i);
+                
+                let distanceSq = x*x + (z+5)*(z+5);
+                let height = 8 * Math.exp(-distanceSq / 40); 
+                let noise = (Math.random() - 0.5) * 0.15;
+                let y = Math.max(0, height + noise);
+
+                positions.setY(i, y);
+                originalPositions.push(y);
+                
+                let shade = 1 - (Math.random() * 0.1);
+                colors.push(baseColor.r * shade, baseColor.g * shade, baseColor.b * shade);
+            }
+
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.computeVertexNormals();
+
+            material = new THREE.MeshStandardMaterial({
+                vertexColors: true, roughness: 1.0, flatShading: true 
+            });
+
+            terrain = new THREE.Mesh(geometry, material);
+            terrain.castShadow = true;
+            terrain.receiveShadow = true;
+            scene.add(terrain);
+        }
+        createTerrain();
+
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(100, 100).rotateX(-Math.PI / 2),
+            new THREE.MeshStandardMaterial({ color: 0xE6D0B3, roughness: 1 })
+        );
+        floor.position.y = -0.1;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const particlesGroup = new THREE.Group();
+        scene.add(particlesGroup);
+        let particles = [];
+
+        function createParticle(isWater) {
+            const size = isWater ? 0.15 : 0.25; 
+            const color = isWater ? 0x88ccff : 0x3E1F00; 
+            
+            const geo = isWater ? new THREE.SphereGeometry(size, 8, 8) : new THREE.DodecahedronGeometry(size);
+            const mat = new THREE.MeshBasicMaterial({ color: color, transparent: isWater, opacity: isWater ? 0.8 : 1.0 });
+            const mesh = new THREE.Mesh(geo, mat);
+            
+            mesh.position.set((Math.random() - 0.5) * 1.5, 8.5, -5 + (Math.random() - 0.5));
+            particlesGroup.add(mesh);
+            particles.push({ mesh: mesh, isWater: isWater, speedZ: 0.03 + Math.random() * 0.02 }); 
+        }
+
+        // --- 이벤트 및 로직 제어 ---
+        let isPouring = false;
+        let totalPouredAmount = 0; 
+        let experimentFinished = false;
+
+        const introModal = document.getElementById('intro-modal');
+        const predModal = document.getElementById('prediction-modal');
+        const cupWrapper = document.getElementById('cup-wrapper');
+        const paperCup = document.getElementById('paper-cup');
+        const markers = document.querySelectorAll('.marker');
+        const obsModal = document.getElementById('observation-modal');
+
+        document.getElementById('go-pred-btn').addEventListener('click', () => {
+            introModal.style.display = 'none';
+            predModal.style.display = 'flex'; 
+        });
+
+        // 예상 데이터 시트 전송
+        document.getElementById('start-btn').addEventListener('click', () => {
+            const val1 = document.getElementById('pred-upper').value.trim();
+            const val2 = document.getElementById('pred-lower').value.trim();
+            if(val1 === '' || val2 === '') { alert('위쪽과 아래쪽의 지형 변화를 모두 예상해서 타자로 적어주세요!'); return; }
+            
+            // 시트로 예측 데이터 보내기
+            sendDataToSheet("예상", "윗부분(상류)", val1);
+            sendDataToSheet("예상", "아랫부분(하류)", val2);
+
+            predModal.style.display = 'none';
+            cupWrapper.style.display = 'flex';
+        });
+
+        const startPouring = (e) => {
+            if (experimentFinished) return;
+            e.preventDefault(); 
+            isPouring = true;
+            paperCup.classList.add('pouring');
+            document.getElementById('cup-instruction').innerText = "깊게 파일수록 검게 그림자가 집니다. 자세히 보세요!";
+        };
+
+        const stopPouring = () => {
+            if (experimentFinished) return;
+            isPouring = false;
+            paperCup.classList.remove('pouring');
+            document.getElementById('cup-instruction').innerText = "다시 꾹 누르면 물이 흐릅니다.";
+        };
+
+        paperCup.addEventListener('mousedown', startPouring);
+        window.addEventListener('mouseup', stopPouring);
+        paperCup.addEventListener('touchstart', startPouring, {passive: false});
+        window.addEventListener('touchend', stopPouring);
+
+        function updateMarkers() {
+            if(!experimentFinished) return;
+            const tempV = new THREE.Vector3();
+            tempV.set(0, 8, -4); tempV.project(camera); setMarkerPosition('marker-upper', tempV);
+            tempV.set(0, 4, 1); tempV.project(camera); setMarkerPosition('marker-middle', tempV);
+            tempV.set(0, 0.5, 7); tempV.project(camera); setMarkerPosition('marker-lower', tempV);
+        }
+
+        function setMarkerPosition(id, vector) {
+            const el = document.getElementById(id);
+            if(vector.z > 1) { el.style.display = 'none'; return; }
+            el.style.display = 'flex';
+            const x = (vector.x * .5 + .5) * window.innerWidth;
+            const y = (vector.y * -.5 + .5) * window.innerHeight;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+        }
+
+        function moveCamera(pos, target) {
+            targetCameraPos.copy(pos);
+            targetControlsTarget.copy(target);
+            isCameraLerping = true;
+        }
+
+        // --- 렌더링 및 애니메이션 루프 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isCameraLerping) {
+                camera.position.lerp(targetCameraPos, 0.05);
+                controls.target.lerp(targetControlsTarget, 0.05);
+                if (camera.position.distanceTo(targetCameraPos) < 0.1) isCameraLerping = false;
+            }
+            controls.update();
+
+            if (isPouring) {
+                totalPouredAmount += 0.01;
+
+                if (Math.random() < 0.2) {
+                    createParticle(true); 
+                    if(Math.random() < 0.4) createParticle(false); 
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    p.mesh.position.z += p.speedZ;
+                    
+                    let distanceSq = p.mesh.position.x*p.mesh.position.x + (p.mesh.position.z+5)*(p.mesh.position.z+5);
+                    let targetY = 8 * Math.exp(-distanceSq / 40);
+                    
+                    p.mesh.position.y = targetY + (p.isWater ? 0.2 : 0.1); 
+                    
+                    if(p.mesh.position.z > -2) p.mesh.position.x += (Math.random() - 0.5) * 0.1;
+
+                    if (p.mesh.position.z > 9) {
+                        particlesGroup.remove(p.mesh);
+                        particles.splice(i, 1);
+                    }
+                }
+
+                const positions = geometry.attributes.position;
+                const colors = geometry.attributes.color;
+                let isChanging = false;
+                
+                for (let i = 0; i < positions.count; i++) {
+                    let x = positions.getX(i);
+                    let z = positions.getZ(i);
+                    let currentY = positions.getY(i);
+                    let origY = originalPositions[i];
+                    let distFromCenter = Math.abs(x);
+                    
+                    if (z > -6 && z < 4) {
+                        let carveWidth = 1.5 + (z + 5) * 0.1; 
+                        if (distFromCenter < carveWidth) {
+                            let erosionStrength = (carveWidth - distFromCenter) * 0.003; 
+                            
+                            if (currentY > origY * 0.4 && currentY > 0.5) { 
+                                positions.setY(i, currentY - erosionStrength);
+                                
+                                let depth = Math.min(2.0, origY - currentY);
+                                let depthRatio = Math.pow(depth / 2.0, 0.7); 
+                                
+                                let targetColor = wetBaseColor.clone().lerp(deepShadowColor, depthRatio);
+                                let colorObj = new THREE.Color().fromArray(colors.array, i * 3);
+                                colorObj.lerp(targetColor, 0.05); 
+                                colors.setXYZ(i, colorObj.r, colorObj.g, colorObj.b);
+                                isChanging = true;
+                            }
+                        }
+                    } 
+                    else if (z >= 4) {
+                        let spread = (z - 3) * 1.2; 
+                        if (distFromCenter < spread) {
+                            let depositionStrength = Math.max(0, (spread - distFromCenter) * 0.0015);
+                            if (currentY < origY + 1.8 && totalPouredAmount > 2.0) { 
+                                positions.setY(i, currentY + depositionStrength);
+                                
+                                let height = Math.min(1.0, currentY - origY);
+                                let heightRatio = height / 1.0;
+
+                                let targetColor = wetBaseColor.clone().lerp(depositedColor, heightRatio);
+                                let colorObj = new THREE.Color().fromArray(colors.array, i * 3);
+                                colorObj.lerp(targetColor, 0.02);
+                                colors.setXYZ(i, colorObj.r, colorObj.g, colorObj.b);
+                                isChanging = true;
+                            }
+                        }
+                    }
+                }
+                if (isChanging) {
+                    positions.needsUpdate = true;
+                    colors.needsUpdate = true;
+                    geometry.computeVertexNormals();
+                }
+
+                if (totalPouredAmount > 7.5) {
+                    isPouring = false;
+                    experimentFinished = true;
+                    cupWrapper.style.display = 'none';
+                    document.getElementById('main-title').innerText = "🔎 관찰을 모두 마치면 퀴즈를 풀어보세요!";
+                    markers.forEach(m => m.style.display = 'flex');
+                    document.getElementById('start-quiz-btn').style.display = 'block'; 
+                }
+            }
+
+            updateMarkers();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+        // --- 클로즈업, 정답 판별 및 관찰 기록 로직 ---
+        const explanations = {
+            upper: "<strong>[침식 작용]</strong> 강 상류에서는 물의 흐름이 빨라 흙이나 모래를 깎아냅니다. 깊게 파인 V자 계곡에 아주 짙은 그림자가 진 것을 볼 수 있습니다.",
+            middle: "<strong>[운반 작용]</strong> 강 중류에서는 상류에서 깎인 흙 덩어리들이 물길을 따라 굴러 내려갑니다. 흙 알갱이들이 이동하는 것을 관찰했죠?",
+            lower: "<strong>[퇴적 작용]</strong> 강 하류에서는 물의 흐름이 느려져 운반되어 온 흙이 바닥에 쌓입니다. 밝은 색의 젖은 흙이 넓은 부채꼴 모양으로 쌓인 것을 볼 수 있습니다."
+        };
+
+        const correctKeywords = {
+            upper: ["침식", "깎", "파인", "패인", "파여", "패여", "v자", "계곡"],
+            middle: ["운반", "이동", "굴러", "내려", "쓸려"],
+            lower: ["퇴적", "쌓", "모여", "부채꼴"]
+        };
+
+        const zoomTargets = {
+            upper: { pos: new THREE.Vector3(0, 11, -1), target: new THREE.Vector3(0, 6, -5) },
+            middle: { pos: new THREE.Vector3(7, 7, 3), target: new THREE.Vector3(0, 3, 1) },
+            lower: { pos: new THREE.Vector3(0, 5, 14), target: new THREE.Vector3(0, 0, 7) }
+        };
+
+        let currentSection = '';
+
+        document.getElementById('marker-upper').onclick = () => openObservation('upper', '강 상류');
+        document.getElementById('marker-middle').onclick = () => openObservation('middle', '강 중류');
+        document.getElementById('marker-lower').onclick = () => openObservation('lower', '강 하류');
+
+        function openObservation(section, title) {
+            currentSection = section;
+            moveCamera(zoomTargets[section].pos, zoomTargets[section].target);
+            
+            markers.forEach(m => m.style.display = 'none');
+            obsModal.style.display = 'flex';
+            document.getElementById('obs-title').innerText = title + " 관찰 기록";
+            document.getElementById('obs-text').value = '';
+            document.getElementById('obs-input-area').style.display = 'block';
+            document.getElementById('obs-explanation').style.display = 'none';
+            document.getElementById('close-obs-btn').style.display = 'none';
+        }
+
+        // 관찰 데이터 시트 전송
+        document.getElementById('submit-obs-btn').onclick = () => {
+            const text = document.getElementById('obs-text').value.trim();
+            if(text === '') {
+                alert('관찰 내용을 타자로 직접 적어야 결과를 확인할 수 있어요!');
+                return;
+            }
+            
+            const keywords = correctKeywords[currentSection];
+            const isCorrect = keywords.some(key => text.includes(key));
+            const sectionName = currentSection === 'upper' ? '상류' : (currentSection === 'middle' ? '중류' : '하류');
+
+            if (isCorrect) {
+                // 정답 데이터 시트 전송
+                sendDataToSheet("관찰", sectionName, text);
+
+                document.getElementById('obs-input-area').style.display = 'none';
+                const expDiv = document.getElementById('obs-explanation');
+                expDiv.innerHTML = "🎉 **정답이에요! 관찰을 아주 잘했군요.**<br><br>" + explanations[currentSection];
+                expDiv.style.display = 'block';
+                document.getElementById('close-obs-btn').style.display = 'block';
+            } else {
+                // 오답 데이터(재시도) 시트 전송
+                sendDataToSheet("관찰", sectionName + "(오답/재시도)", text);
+
+                const hints = {
+                    upper: "상류에서는 흙이 어떻게 되었나요? '깎이거나 파인' 모습에 집중해 보세요.",
+                    middle: "중류에서는 흙이 어디로 가고 있나요? '이동'하는 모습에 집중해 보세요.",
+                    lower: "하류에서는 흙이 어떻게 되었나요? 바닥에 '쌓인' 모습에 집중해 보세요."
+                };
+                alert("다시 한번 자세히 관찰해 볼까요? 🍓\n\n힌트: " + hints[currentSection]);
+            }
+        };
+
+        document.getElementById('close-obs-btn').onclick = () => {
+            obsModal.style.display = 'none';
+            markers.forEach(m => m.style.display = 'flex');
+            moveCamera(defaultCameraPos, defaultControlsTarget); 
+        };
+
+        // --- 마무리 퀴즈 로직 및 시트 연동 ---
+        const quizData = [
+            { type: "chosung", q: "1. 강 상류에서 물의 흐름이 빨라 흙이나 모래가 깎이는 작용은 무엇일까요? (초성: ㅊㅅ)", answer: "침식" },
+            { type: "ox", q: "2. 강 중류에서는 상류에서 깎인 흙이 물을 따라 아래로 이동하는 '운반 작용'이 일어난다.", answer: "O" },
+            { type: "chosung", q: "3. 물의 흐름이 느려지는 강 하류에서 흙이 바닥에 쌓이는 작용은 무엇일까요? (초성: ㅌㅈ)", answer: "퇴적" },
+            { type: "choice", q: "4. 물이 흐르면서 깊게 파인 V자 모양의 계곡을 주로 볼 수 있는 곳은 어디인가요?", options: ["강 상류", "강 중류", "강 하류"], answer: "강 상류" },
+            { type: "ox", q: "5. 흐르는 물은 흙을 깎고, 나르고, 쌓으면서 지표의 모습을 변화시킬 수 있다.", answer: "O" }
+        ];
+
+        let currentQIndex = 0;
+        let currentQuizFails = 0;  // 현재 문제 오답 횟수
+        let quizScoreTracker = []; // 전체 문제 정오표 기록용
+
+        const quizModal = document.getElementById('quiz-modal');
+        const startQuizBtn = document.getElementById('start-quiz-btn');
+
+        startQuizBtn.onclick = () => {
+            startQuizBtn.style.display = 'none';
+            markers.forEach(m => m.style.display = 'none');
+            quizModal.style.display = 'flex';
+            currentQIndex = 0;
+            quizScoreTracker = [];
+            currentQuizFails = 0;
+            renderQuiz();
+        };
+
+        function renderQuiz() {
+            if(currentQIndex >= quizData.length) {
+                document.getElementById('quiz-question').innerText = "🎉 모든 퀴즈를 완료했습니다!";
+                document.getElementById('quiz-content').innerHTML = "<p style='text-align:center;'>오늘 과학 실험 정말 잘했어요! 🍓</p><button class='btn-primary' onclick='location.reload()'>처음부터 다시 하기</button>";
+                document.getElementById('quiz-feedback').innerText = "";
+                
+                // 퀴즈 5개 모두 풀면 정오표를 조합해서 시트로 전송
+                let finalScoreString = quizScoreTracker.map((res, idx) => `${idx+1}번:${res}`).join(" / ");
+                sendDataToSheet("퀴즈", "최종 정오표", finalScoreString);
+
+                return;
+            }
+
+            const q = quizData[currentQIndex];
+            document.getElementById('quiz-question').innerText = q.q;
+            const contentDiv = document.getElementById('quiz-content');
+            contentDiv.innerHTML = '';
+            document.getElementById('quiz-feedback').innerText = '';
+
+            if (q.type === 'choice') {
+                q.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'quiz-option-btn';
+                    btn.innerText = opt;
+                    btn.onclick = () => checkQuizAnswer(opt, btn, q.answer);
+                    contentDiv.appendChild(btn);
+                });
+            } else if (q.type === 'ox') {
+                const flex = document.createElement('div');
+                flex.style.display = 'flex'; flex.style.gap = '20px'; flex.style.justifyContent = 'center';
+                ['O', 'X'].forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-primary';
+                    btn.style.fontSize = '40px'; btn.style.width = '120px'; btn.style.backgroundColor = '#3498db';
+                    btn.innerText = opt;
+                    btn.onclick = () => checkQuizAnswer(opt, btn, q.answer);
+                    flex.appendChild(btn);
+                });
+                contentDiv.appendChild(flex);
+            } else if (q.type === 'chosung') {
+                const input = document.createElement('input');
+                input.type = 'text'; 
+                input.placeholder = '정답을 입력하세요'; 
+                input.style.fontSize = '18px'; input.style.marginBottom = '10px';
+                
+                const btn = document.createElement('button');
+                btn.className = 'btn-primary'; btn.innerText = '정답 확인';
+                btn.onclick = () => checkQuizAnswer(input.value.trim(), btn, q.answer);
+                
+                contentDiv.appendChild(input);
+                contentDiv.appendChild(btn);
+            }
+        }
+
+        function checkQuizAnswer(selected, btn, correctAnswer) {
+            const feedback = document.getElementById('quiz-feedback');
+            
+            if (selected === correctAnswer || selected === correctAnswer + "작용" || selected === correctAnswer + " 작용") {
+                feedback.style.color = '#2ecc71';
+                feedback.innerText = "⭕ 정답입니다! 참 잘했어요.";
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.color = 'white';
+                
+                // 정오표 기록 (한 번도 안 틀렸으면 O, 틀렸었으면 X(재시도))
+                if (currentQuizFails === 0) {
+                    quizScoreTracker.push("O");
+                } else {
+                    quizScoreTracker.push("X(재시도)");
+                }
+                currentQuizFails = 0; // 다음 문제를 위해 초기화
+                
+                setTimeout(() => {
+                    currentQIndex++;
+                    renderQuiz();
+                }, 1500);
+            } else {
+                feedback.style.color = '#e74c3c';
+                feedback.innerText = "❌ 아쉽네요, 다시 한번 생각해 보세요!";
+                currentQuizFails++; // 오답 횟수 증가
+                
+                quizModal.style.transform = "translate(-50%, -50%) translateX(-10px)";
+                setTimeout(() => quizModal.style.transform = "translate(-50%, -50%) translateX(10px)", 50);
+                setTimeout(() => quizModal.style.transform = "translate(-50%, -50%) translateX(0)", 100);
+            }
+        }
+
+    </script>
+</body>
+</html>
